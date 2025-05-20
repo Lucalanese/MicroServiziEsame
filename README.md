@@ -1,186 +1,98 @@
-# Introduzione
+# Microservizio Gestione Esami
 
-## Scopo del microservizio
+## Descrizione
 
-Il microservizio di **Gestione Esami** ha il compito di gestire tutte le operazioni relative agli esami universitari, tra cui la pianificazione, la registrazione, l'iscrizione da parte degli studenti e la pubblicazione degli esiti. Questo microservizio è un componente fondamentale della piattaforma universitaria e permette l’interazione tra studenti, docenti e segreteria.
+Il microservizio che riguarda la Gestione Esami è responsabile delle operazioni legate appunto alla gestione degli esami all’interno della piattaforma universitaria. Essa fornisce funzionalità per visualizzare il calendario degli esami, l’iscrizione degli studenti, la registrazione dei voti da parte dei docenti e la pianificazione degli esami da parte dell’amministrazione.
 
-### Funzionalità principali
+Le funzionalità principali sono:
 
-Il microservizio offre le seguenti funzionalità:
+- Visualizzazione del calendario esami (tutti gli utenti)
+- Iscrizione agli esami (studenti)
+- Registrazione voti (docenti)
+- Pianificazione esami (amministrativi)
+- Visualizzazione risultati esami (studenti)
 
-- Creazione e gestione degli appelli d’esame
-- Iscrizione e cancellazione da parte degli studenti
-- Inserimento e modifica degli esiti d’esame da parte dei docenti
-- Consultazione degli appelli ed esiti da parte degli studenti
-- Notifica di eventi importanti tramite RabbitMQ (es. pubblicazione esiti)
+## Tech Stack
 
-### Architettura
+- Framework: SpringBoot  
+- Message Broker: RabbitMQ  
+- Database: MySQL  
+- Containerization: Docker (non presente su questa repo)  
+- Orchestration: Kubernetes (non presente su questa repo)  
+- API Documentation: Swagger/OpenAPI 3.0  
 
-### Tecnologie utilizzate
+## Modello dei dati (descrizione)
 
-- **Spring Boot**: Framework per lo sviluppo del microservizio
-- **PostgreSQL**: Database relazionale per la persistenza dei dati
-- **RabbitMQ**: Sistema di messaggistica per la comunicazione asincrona
+- **Esame**: id, id_corso, data, ora, aula, stato (pianificato, concluso)
+- **IscrizioneEsame**: id, id_esame, id_studente, stato (in attesa, approvata, rifiutata), data_iscrizione
+- **VotoEsame**: id, id_iscrizione, voto, lode, data_registrazione, note
+- **CalendarioEsami**: collezione di esami con filtri per periodo, corso, docente
 
-### Schema di base del sistema
+## API REST
 
-Il microservizio adotta un’architettura a strati ispirata al pattern MVC con un livello service per la business logic:
+### Esami Endpoint
 
-- **Model**: Entità come Exam, ExamSession, ExamResult
-- **Repository**: Interfacce che accedono al database tramite Spring Data JPA
-- **Service**: Logica di business legata alla gestione degli esami
-- **Controller**: API REST esposte verso il mondo esterno
-- **Messaging**: Gestione eventi tramite RabbitMQ
+- `GET /api/v1/exams`  
+  Recupera il calendario degli esami disponibili (per tutti).
 
-### API
+- `GET /api/v1/exams/{id}`  
+  Recupera i dettagli di un singolo esame (per tutti).
 
-### Endpoint disponibili
+- `POST /api/v1/exams`  
+  Pianifica un nuovo esame (solo amministratori).
 
-#### API per la gestione degli appelli
+- `PUT /api/v1/exams/{id}`  
+  Modifica i dettagli di un esame (solo amministratori).
 
-- `POST /api/exams/sessions` –Crea un nuovo appello d’esame
-- `GET /api/exams/sessions` – Elenca tutti gli appelli
-- `GET /api/exams/sessions/{sessionId}` – Visualizza i dettagli di un appello
-- `DELETE /api/exams/sessions/{sessionId}` – Cancella un appello
+- `DELETE /api/v1/exams/{id}`  
+  Elimina un esame pianificato (solo amministratori).
 
-### API per l'iscrizione agli esami
+### Iscrizioni Esami Endpoint
 
-- `POST /api/exams/sessions/{sessionId}/enroll` – Iscrive uno studente all’esame
-- `DELETE /api/exams/sessions/{sessionId}/unenroll/{studentId}` – Annulla l’iscrizione
+- `POST /api/v1/exams/{id}/enroll`  
+  Iscrizione dello studente a un esame.
 
-### API per la gestione degli esiti
+- `GET /api/v1/exams/{id}/enrollments`  
+  Recupera le iscrizioni per un esame (per docenti e amministratori).
 
-- `POST /api/exams/results` – Registra un nuovo esito d’esame
-- `PUT /api/exams/results/{resultId}` – Modifica un esito
-- `GET /api/exams/results/student/{studentId}` – Elenca gli esiti di uno studente
-- `GET /api/exams/results/session/{sessionId}` – Elenca tutti gli esiti per un appello
+- `PUT /api/v1/enrollments/{enrollmentId}/status`  
+  Aggiorna lo stato di un’iscrizione (approvata/rifiutata) (per amministratori).
 
-### Esempi di richieste e risposte
+### Voti Esami Endpoint
 
-### Iscrizione a un appello
+- `POST /api/v1/exams/{id}/grades`  
+  Registra un voto per uno studente in un esame (per docenti).
 
-**Richiesta:**
+- `GET /api/v1/exams/{id}/grades`  
+  Visualizza tutti i voti per un esame (docenti e amministratori).
 
-``` http
-POST /api/exams/sessions/123/enroll
-Content-Type: application/json
+- `GET /api/v1/students/{id}/grades`  
+  Visualizza i voti di uno studente per tutti gli esami (perstudenti).
 
-{
-  "studentId": "s456"
-}
-```
+## Integrazione con altri Microservizi
 
-**Risposta:**
+Il microservizio Gestione Esami interagisce con  **Gestione Utenti e Ruoli** per l'autenticazione, l'autorizzazione e per recuperare le  informazioni sugli utenti (studenti, docenti, amministrativi) poi con **Gestione Corsi** per ottenere informazioni sui corsi associati agli esami e con **Valutazione e Feedback** per sincronizzare i voti degli esami con le valutazioni.  
 
-``` json
-Status: 200 OK
-Content-Type: application/json
+## Eventi (RabbitMQ)
 
-{
-  "message": "Iscrizione completata con successo"
-}
-```
+**Eventi pubblicati:**
 
-## Database
+- `exam.created` — Quando un esame viene pianificato.  
+- `exam.updated` — Quando un esame viene modificato.  
+- `exam.deleted` — Quando un esame viene cancellato.  
+- `exam.enrollment.requested` — Quando uno studente richiede iscrizione a un esame.  
+- `exam.enrollment.status_changed` — Quando lo stato dell’iscrizione cambia (approvata o rifiutata).  
+- `exam.grade.recorded` — Quando un voto viene registrato.
 
-### Struttura tabelle principali
+**Eventi consumati:**
 
-#### Tabelle exam_session
+- `user.updated` — Per aggiornare le informazioni degli utenti coinvolti negli esami.  
+- `course.updated` — Per aggiornare le informazioni dei corsi associati agli esami.
 
-``` sql
-CREATE TABLE exam_sessions (
-  id SERIAL PRIMARY KEY,
-  course_id VARCHAR NOT NULL,
-  date DATE NOT NULL,
-  location VARCHAR,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
+## Sicurezza e Autorizzazioni
 
-#### Tabella exam_enrollments
+L’accesso alle API è regolato da autorizzazioni basate sui ruoli:
 
-```sql
-CREATE TABLE exam_enrollments (
-  id SERIAL PRIMARY KEY,
-  session_id INT REFERENCES exam_sessions(id),
-  student_id VARCHAR NOT NULL,
-  enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-#### Tabella exam_results
-
-```sql
-CREATE TABLE exam_results (
-  id SERIAL PRIMARY KEY,
-  session_id INT REFERENCES exam_sessions(id),
-  student_id VARCHAR NOT NULL,
-  grade INT,
-  published_at TIMESTAMP,
-  status VARCHAR -- E.g., "VERBALIZZATO", "DA_ACCETTARE", etc.
-);
-
-```
-
-## Integrazione
-
-### Come interagire con il servizio
-
-Il microservizio espone API REST per consentire a studenti, docenti e personale amministrativo di gestire tutte le attività relative agli esami. Eventuali modifiche rilevanti (es. inserimento o modifica di un esito) possono generare eventi RabbitMQ per avvisare altri servizi (es. notifiche).
-
-### Esempio di uso di RabbitMQ
-
-#### Configurazione RabbitMQ
-
-``` java
-@Configuration
-public class RabbitMQExamConfig {
-    public static final String EXAM_EVENT_QUEUE = "exam.event.queue";
-    public static final String EXAM_EXCHANGE = "exam.exchange";
-    public static final String EXAM_ROUTING_KEY = "exam.event.routingkey";
-
-    @Bean
-    public Queue examQueue() {
-        return new Queue(EXAM_EVENT_QUEUE, false);
-    }
-
-    @Bean
-    public DirectExchange examExchange() {
-        return new DirectExchange(EXAM_EXCHANGE);
-    }
-
-    @Bean
-    public Binding binding(Queue examQueue, DirectExchange examExchange) {
-        return BindingBuilder.bind(examQueue).to(examExchange).with(EXAM_ROUTING_KEY);
-    }
-}
-```
-
-#### Evento di pubblicazione esito
-
-``` java
-@Component
-public class ExamEventPublisher {
-
-    @Autowired
-    private RabbitTemplate rabbitTemplate;
-
-    public void publishGradeNotification(String studentId, int grade, String courseId) {
-        Map<String, Object> event = new HashMap<>();
-        event.put("studentId", studentId);
-        event.put("grade", grade);
-        event.put("courseId", courseId);
-        event.put("type", "GRADE_PUBLISHED");
-
-        rabbitTemplate.convertAndSend(
-            RabbitMQExamConfig.EXAM_EXCHANGE,
-            RabbitMQExamConfig.EXAM_ROUTING_KEY,
-            event
-        );
-    }
-}
-```
-
-## Conclusioni
-
-Il microservizio **Gestione Esami** centralizza tutte le operazioni legate agli appelli e agli esiti d’esame, integrandosi perfettamente con altri microservizi del sistema universitario. Grazie all’utilizzo di PostgreSQL e RabbitMQ, il sistema garantisce sia affidabilità nella persistenza dei dati che flessibilità nella comunicazione asincrona, migliorando l’esperienza utente e l’interoperabilità tra i moduli.
+- **ROLE_ADMINISTRATIVE:** Può pianificare, modificare e cancellare esami, gestire iscrizioni e visualizzare voti di tutti gli studenti.  
+- **ROLE_TEACHER:** Può registrare voti e visualizzare iscrizioni e voti degli esami dei propri corsi.  
+- **ROLE_STUDENT:** Può iscriversi agli esami, visualizzare il calendario esami e i propri risultati.
