@@ -5,7 +5,7 @@
 Questo Microservizio è responsabile della gestione completa degli esami all'interno della piattaforma universitaria, fornendo funzionalità per la pianificazione, iscrizione, conduzione e valutazione degli esami:
 
 - **(Amministrativi)** Pianificazione e gestione del calendario esami
-- **(Studenti)** Iscrizione agli esami e visualizzazione risultati  
+- **(Studenti)** Iscrizione agli esami e visualizzazione risultati
 - **(Docenti)** Registrazione voti e gestione delle valutazioni
 - **(Tutti)** Visualizzazione del calendario esami e consultazione informazioni
 
@@ -26,66 +26,80 @@ DataTransferObject presenti nel microservizio.
 
 #### DTO per l'Esame
 
-```java
+``` java
 public class ExamDTO {
     private Long id;
+    private String name;
+    private LocalDate date;
+    private LocalTime time;
     private Long courseId;
     private String courseName;
-    private Long teacherId;
-    private String teacherName;
-    private LocalDate examDate;
-    private LocalTime examTime;
-    private String classroom;
+    private Long professorId;
+    private String professorName;
+    private Long classroomId;
+    private String classroomName;
+    private Integer maxStudents;
+    private LocalDate enrollmentDeadline;
     private ExamStatus status;
-    private Integer maxEnrollments;
+    private String notes;
     private Integer currentEnrollments;
-    private LocalDateTime creationDate;
+    private Boolean enrollmentOpen;
 }
 ```
 
 #### DTO per l'Iscrizione Esame
 
-```java
+``` java
 public class EnrollmentDTO {
     private Long id;
     private Long examId;
+    private String examName;
+    private LocalDate examDate;
     private Long studentId;
     private String studentName;
     private EnrollmentStatus status;
     private LocalDateTime enrollmentDate;
     private String notes;
-    private String adminNotes;
+    private Boolean hasGrade;
+    private Integer grade;
 }
 ```
 
 #### DTO per il Voto Esame
 
-```java
+``` java
+
 public class GradeDTO {
     private Long id;
     private Long enrollmentId;
+    private Long examId;
+    private String examName;
     private Long studentId;
     private String studentName;
-    private Long examId;
     private Integer grade;
-    private Boolean withHonors;
-    private LocalDateTime recordingDate;
-    private String notes;
+    private Boolean honors;
+    private GradeStatus status;
+    private LocalDateTime evaluationDate;
+    private Long professorId;
+    private String professorName;
     private String feedback;
+    private LocalDateTime publishedDate;
+    private String formattedGrade;
 }
 ```
 
 #### DTO per il Calendario Esami
 
-```java
+``` java
+
 public class ExamCalendarDTO {
     private Long examId;
     private String courseCode;
     private String courseName;
-    private String teacherName;
+    private String professorName;
     private LocalDate examDate;
     private LocalTime examTime;
-    private String classroom;
+    private String classroomName;
     private Integer availableSlots;
     private ExamStatus status;
 }
@@ -98,34 +112,41 @@ Tabelle in MySQL per strutture dati del microservizio
 #### Exam (Esame)
 
 - `id` - ID esame
+- `name` - Nome dell'esame
+- `date` - Data dell'esame
+- `time` - Orario dell'esame
 - `course_id` - ID corso (riferimento esterno)
-- `teacher_id` - ID docente (riferimento esterno)
-- `exam_date` - Data dell'esame
-- `exam_time` - Orario dell'esame
-- `classroom` - Aula
-- `status` - Stato (enum: PLANNED, ONGOING, COMPLETED, CANCELLED)
-- `max_enrollments` - Numero massimo iscrizioni
-- `creation_date` - Data creazione
-- `last_modified` - Data ultima modifica
+- `professor_id` - ID professore (riferimento esterno)
+- `classroom_id` - ID dell'aula
+- `max_students` - Numero massimo studenti ammessi
+- `enrollment_deadline` - Data limite per le iscrizioni
+- `status` - Stato (enum: SCHEDULED, ONGOING, COMPLETED, CANCELLED)
+- `notes` - Note aggiuntive sull'esame
+- Relazione one-to-many con `exam_enrollments`
 
 #### ExamEnrollment (Iscrizione Esame)
 
 - `id` - ID iscrizione
 - `exam_id` - ID esame (FK)
 - `student_id` - ID studente (riferimento esterno)
-- `status` - Stato (enum: PENDING, APPROVED, REJECTED, COMPLETED)
 - `enrollment_date` - Data iscrizione
+- `status` - Stato (enum: ENROLLED, WITHDREW, REJECTED, COMPLETED)
 - `notes` - Note studente
-- `admin_notes` - Note amministratore
+- Relazione many-to-one con `exams`
+- Relazione one-to-one con `exam_grades`
 
 #### ExamGrade (Voto Esame)
+
 - `id` - ID voto
 - `enrollment_id` - ID iscrizione (FK)
-- `grade` - Voto (18-30)
-- `with_honors` - Con lode (boolean)
-- `recording_date` - Data registrazione
-- `notes` - Note docente
+- `grade` - Voto (0-30)
+- `honors` - Con lode (boolean)
+- `status` - Stato del voto
+- `evaluation_date` - Data valutazione
+- `professor_id` - ID del professore che ha registrato il voto
 - `feedback` - Feedback dettagliato
+- `published_date` - Data pubblicazione
+- Relazione one-to-one con `exam_enrollments`
 
 ## API REST
 
@@ -133,7 +154,8 @@ Tabelle in MySQL per strutture dati del microservizio
 
 #### Gestione Esami (per Amministrativi)
 
-```
+``` 
+
 #############################################
 # Crea nuovo esame
 # @func: createExam()
@@ -145,7 +167,7 @@ POST    /api/v1/exams
 #############################################
 # Lista tutti gli esami
 # @func: getAllExams()
-# @param: startDate, endDate, courseId, teacherId, page, size
+# @param: startDate, endDate, courseId, professorId, page, size
 # @return: ResponseEntity<List<ExamDTO>>
 #############################################
 GET     /api/v1/exams
@@ -183,21 +205,22 @@ DELETE  /api/v1/exams/{id}
 GET     /api/v1/exams/course/{courseId}
 
 #############################################
-# Esami per docente
-# @func: getExamsByTeacher()
-# @param: Long teacherId
+# Esami per professore
+# @func: getExamsByProfessor()
+# @param: Long professorId
 # @return: ResponseEntity<List<ExamDTO>>
 #############################################
-GET     /api/v1/exams/teacher/{teacherId}
+GET     /api/v1/exams/professor/{professorId}
 ```
 
 #### Visualizzazione Calendario (per Tutti)
 
-```
+``` 
+
 #############################################
 # Calendario esami pubblico
 # @func: getExamCalendar()
-# @param: startDate, endDate, courseId, teacherId
+# @param: startDate, endDate, courseId, professorId
 # @return: ResponseEntity<List<ExamCalendarDTO>>
 #############################################
 GET     /api/v1/exams/calendar
@@ -210,12 +233,12 @@ GET     /api/v1/exams/calendar
 #############################################
 GET     /api/v1/exams/available
 ```
-
 ### Enrollments Endpoint
 
 #### Gestione Iscrizioni (per Studenti)
 
-```
+``` 
+
 #############################################
 # Iscrizione a esame
 # @func: enrollToExam()
@@ -251,7 +274,8 @@ DELETE  /api/v1/enrollments/{id}
 
 #### Gestione Iscrizioni (per Amministrativi)
 
-```
+``` 
+
 #############################################
 # Iscrizioni per esame
 # @func: getExamEnrollments()
@@ -289,7 +313,7 @@ GET     /api/v1/enrollments/student/{studentId}
 
 #### Gestione Voti (per Docenti)
 
-```
+``` 
 #############################################
 # Registra voto
 # @func: recordGrade()
@@ -301,7 +325,7 @@ POST    /api/v1/exams/{examId}/grades
 #############################################
 # Voti per esame
 # @func: getExamGrades()
-# @param: Long examId, minGrade, maxGrade, withHonors, page, size
+# @param: Long examId, minGrade, maxGrade, honors, page, size
 # @return: ResponseEntity<List<GradeDTO>>
 #############################################
 GET     /api/v1/exams/{examId}/grades
@@ -333,7 +357,7 @@ DELETE  /api/v1/grades/{id}
 
 #### Visualizzazione Voti (per Studenti)
 
-```
+``` 
 #############################################
 # I miei voti
 # @func: getMyGrades()
@@ -387,14 +411,14 @@ Il microservizio Gestione Esami interagisce con i seguenti microservizi:
 - `user.updated`: Per aggiornare le informazioni degli utenti
 - `course.updated`: Per aggiornare le informazioni dei corsi
 - `course.deleted`: Per gestire la cancellazione di corsi con esami associati
-- `teacher.course.assigned`: Per notificare nuove assegnazioni docenti
+- `professor.course.assigned`: Per notificare nuove assegnazioni professori
 
 ## Sicurezza e Autorizzazioni
 
 L'accesso alle API è regolato da autorizzazioni basate sui ruoli:
 
 - **ROLE_ADMINISTRATIVE:** Può pianificare, modificare e cancellare esami, gestire tutte le iscrizioni, visualizzare tutti i voti e generare statistiche
-- **ROLE_TEACHER:** Può registrare e modificare voti per i propri corsi, visualizzare iscrizioni e voti degli esami dei propri corsi
+- **ROLE_PROFESSOR:** Può registrare e modificare voti per i propri corsi, visualizzare iscrizioni e voti degli esami dei propri corsi
 - **ROLE_STUDENT:** Può iscriversi agli esami disponibili, visualizzare il calendario esami, consultare le proprie iscrizioni e visualizzare i propri voti
 
 ### Controlli di Sicurezza Aggiuntivi
@@ -404,3 +428,4 @@ L'accesso alle API è regolato da autorizzazioni basate sui ruoli:
 - Verifica dei prerequisiti per l'iscrizione agli esami
 - Audit trail per tutte le operazioni sensibili (creazione/modifica voti)
 - Rate limiting per le API di iscrizione per prevenire spam
+- Autenticazione tramite JWT con verifica del target audienc
